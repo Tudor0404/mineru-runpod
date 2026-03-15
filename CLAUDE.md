@@ -50,7 +50,7 @@ curl -X POST http://localhost:8000/run \
 | `MINERU_PDF_RENDER_THREADS` | `8` | PDF rendering threads |
 | `OMP_NUM_THREADS` | `8` | OpenMP threads |
 | `TORCH_COMPILE` | `1` | Enable torch.compile for OCR |
-| `TORCH_COMPILE_MODE` | `default` | torch.compile mode |
+| `TORCH_COMPILE_MODE` | `reduce-overhead` | torch.compile mode (CUDA graphs) |
 | `RUNPOD_INIT_TIMEOUT` | `300` | Init timeout (seconds) |
 | `DEBUG_SERVER` | `false` | Run as FastAPI on port 8000 |
 | `OCR_DET_MAX_FORWARD_BATCH` | `1` | Cap OCR-det batch size |
