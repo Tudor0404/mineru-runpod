@@ -100,7 +100,10 @@ def _repair_pdf(pdf_bytes: bytes) -> bytes:
 
 def _do_convert(pdf_bytes, lang, parse_method, formula_enable, table_enable,
                 max_pages, pages, start_time):
-    """Core conversion: doc_analyze -> result_to_middle_json -> union_make."""
+    """Core conversion: doc_analyze -> result_to_middle_json -> union_make.
+
+    Returns (md_content, content_list, metadata).
+    """
     if pages is not None:
         pdf_bytes = _extract_specific_pages(pdf_bytes, pages)
 
@@ -130,6 +133,7 @@ def _do_convert(pdf_bytes, lang, parse_method, formula_enable, table_enable,
         )
         pdf_info = middle_json["pdf_info"]
         md_content = pipeline_union_make(pdf_info, MakeMode.MM_MD, "images")
+        content_list = pipeline_union_make(pdf_info, MakeMode.CONTENT_LIST, "images")
 
     processing_time_ms = round((time.time() - start_time) * 1000)
     metadata = {
@@ -137,7 +141,7 @@ def _do_convert(pdf_bytes, lang, parse_method, formula_enable, table_enable,
         "ocr": _ocr_enable,
         "processing_time_ms": processing_time_ms,
     }
-    return md_content, metadata
+    return md_content, content_list, metadata
 
 
 def _convert_single(pdf_bytes, start_time, lang="en", parse_method="auto",
@@ -245,7 +249,7 @@ async def handler(event):
 
         pdf_bytes = base64.b64decode(base64_content)
 
-        md_content, metadata = await async_convert_to_markdown(
+        md_content, content_list, metadata = await async_convert_to_markdown(
             pdf_bytes=pdf_bytes,
             timeout_seconds=timeout_seconds,
             lang=lang,
@@ -256,7 +260,12 @@ async def handler(event):
             pages=pages,
         )
 
-        return {"markdown": md_content, "status": "SUCCESS", **metadata}
+        return {
+            "markdown": md_content,
+            "content_list": content_list,
+            "status": "SUCCESS",
+            **metadata,
+        }
 
     except TimeoutError as e:
         return {"error": str(e), "status": "TIMEOUT"}
