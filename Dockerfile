@@ -60,6 +60,8 @@ RUN mineru-models-download -s huggingface -m pipeline
 COPY app/ ./app/
 
 # Environment configuration
+ENV CUDA_MODULE_LOADING=LAZY
+ENV TORCHINDUCTOR_CACHE_DIR=/app/.torch_cache
 ENV MINERU_MODEL_SOURCE=local
 ENV MINERU_PDF_RENDER_THREADS=8
 ENV OMP_NUM_THREADS=8

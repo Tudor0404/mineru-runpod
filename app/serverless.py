@@ -278,11 +278,15 @@ async def handler(event):
 # ---------------------------------------------------------------------------
 
 def _warmup_with_inference():
-    """Run a full inference pass on a synthetic PDF to trigger torch.compile."""
+    """Run a full inference pass on a synthetic PDF to trigger torch.compile.
+
+    2 pages is sufficient — torch.compile(dynamic=True) compiles once for
+    arbitrary shapes, so extra pages are redundant inference cycles.
+    """
     thread = threading.current_thread().name
     print(f"[{thread}] Running warm-up inference to trigger torch.compile...")
     start = time.time()
-    pdf_bytes = create_warmup_pdf(num_pages=8)
+    pdf_bytes = create_warmup_pdf(num_pages=2)
     try:
         _do_convert(
             pdf_bytes, lang="en", parse_method="ocr",
@@ -302,16 +306,28 @@ def _full_warmup():
     Executed inside _gpu_executor so cuDNN algorithm caches live in the
     same thread that will later handle real inference requests.
     """
+    warmup_start = time.time()
     thread = threading.current_thread().name
+
+    # Phase 1: Model loading
     print(f"[{thread}] Loading pipeline models...")
+    t0 = time.time()
     ModelSingleton().get_model(
         lang="en",
         formula_enable=True,
         table_enable=True,
     )
-    print(f"[{thread}] Pipeline models loaded")
+    model_load_s = round(time.time() - t0, 1)
+    print(f"[{thread}] Pipeline models loaded in {model_load_s}s")
+
+    # Phase 2: Warmup inference (triggers torch.compile)
+    t0 = time.time()
     _warmup_with_inference()
-    print(f"[{thread}] Full warmup complete")
+    inference_s = round(time.time() - t0, 1)
+
+    total_s = round(time.time() - warmup_start, 1)
+    print(f"[{thread}] Full warmup complete in {total_s}s "
+          f"(model_load={model_load_s}s, inference={inference_s}s)")
 
 
 def _gpu_diagnostics():
