@@ -330,6 +330,36 @@ def _full_warmup():
           f"(model_load={model_load_s}s, inference={inference_s}s)")
 
 
+def _setup_torch_cache():
+    """Namespace TorchInductor cache by GPU compute capability.
+
+    Triton kernels are architecture-specific — an A100 (sm_80) cache can't
+    be used on an L4 (sm_89). Appending the compute capability prevents
+    collisions when TORCHINDUCTOR_CACHE_DIR points to a shared persistent
+    volume (e.g. /runpod-volume/torch_cache).
+
+    With a persistent volume, the first cold start compiles and populates
+    the cache (~60-120s). Subsequent starts on the same GPU type load
+    cached kernels (~1-2s) — warmup inference still runs for CUDA graph
+    capture but skips the expensive Triton compilation.
+    """
+    if not torch.cuda.is_available():
+        return
+    major, minor = torch.cuda.get_device_capability(0)
+    gpu_arch = f"sm_{major}{minor}"
+    base_dir = os.environ.get("TORCHINDUCTOR_CACHE_DIR", "/app/.torch_cache")
+    cache_dir = os.path.join(base_dir, gpu_arch)
+    os.makedirs(cache_dir, exist_ok=True)
+    os.environ["TORCHINDUCTOR_CACHE_DIR"] = cache_dir
+
+    try:
+        has_entries = bool(os.listdir(cache_dir))
+    except OSError:
+        has_entries = False
+    state = "pre-populated" if has_entries else "empty"
+    print(f"  torch_cache: {cache_dir} ({state})")
+
+
 def _gpu_diagnostics():
     """Print GPU/CUDA diagnostics at startup."""
     info = {
@@ -361,6 +391,7 @@ def _gpu_diagnostics():
 if __name__ == "__main__":
     print("=== GPU Diagnostics ===")
     _diag = _gpu_diagnostics()
+    _setup_torch_cache()
     print("=======================")
 
     # Run all warmup on the GPU thread so cuDNN caches are reused at inference time

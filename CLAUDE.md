@@ -13,7 +13,7 @@ RunPod serverless worker that runs MinerU for PDF-to-markdown conversion with op
 
 1. Models baked into Docker image (no runtime download)
 2. `torch.compile(dynamic=True)` on OCR-det and OCR-rec (compiled kernels handle all shapes)
-3. Synthetic 8-page PDF warmup at startup (triggers compilation)
+3. Synthetic 2-page PDF warmup at startup (triggers compilation)
 4. GPU thread pinning (cuDNN caches are per-thread)
 5. OCR-det batch size capped to N=1 (matches compiled kernel cache)
 6. Layout/MFD batch sizes increased to 8
@@ -47,6 +47,10 @@ curl -X POST http://localhost:8000/run \
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `MINERU_MODEL_SOURCE` | `local` | Use baked-in models |
+| `HF_HUB_OFFLINE` | `1` | Prevent huggingface_hub HTTP calls |
+| `TRANSFORMERS_OFFLINE` | `1` | Prevent transformers HTTP calls |
+| `CUDA_MODULE_LOADING` | `LAZY` | Defer unused CUDA kernel loading |
+| `TORCHINDUCTOR_CACHE_DIR` | `/app/.torch_cache` | torch.compile cache (GPU arch auto-appended). Point to a RunPod network volume to persist across cold starts |
 | `MINERU_PDF_RENDER_THREADS` | `8` | PDF rendering threads |
 | `OMP_NUM_THREADS` | `8` | OpenMP threads |
 | `TORCH_COMPILE` | `1` | Enable torch.compile for OCR |

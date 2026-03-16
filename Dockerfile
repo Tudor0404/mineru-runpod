@@ -61,6 +61,9 @@ COPY app/ ./app/
 
 # Environment configuration
 ENV CUDA_MODULE_LOADING=LAZY
+# torch.compile cache — GPU arch auto-appended at runtime (e.g. /app/.torch_cache/sm_80).
+# Override to a RunPod network volume (e.g. /runpod-volume/torch_cache) to persist
+# compiled Triton kernels across cold starts and skip ~60-120s recompilation.
 ENV TORCHINDUCTOR_CACHE_DIR=/app/.torch_cache
 ENV MINERU_MODEL_SOURCE=local
 ENV HF_HUB_OFFLINE=1
