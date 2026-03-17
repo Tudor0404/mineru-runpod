@@ -38,14 +38,21 @@ curl -X POST http://localhost:8000/run \
 
 ## API
 
-**Input:** `file_content` (base64 PDF), `filename`, `lang`, `parse_method`, `formula_enable`, `table_enable`, `max_pages`, `pages` (1-indexed list), `timeout` (ms), `created_at` (epoch ms)
+**Input (S3 mode):** `s3_key`, `lang`, `parse_method`, `formula_enable`, `table_enable`, `max_pages`, `pages` (1-indexed list), `timeout` (ms), `created_at` (epoch ms)
 
-**Output:** `markdown`, `status`, `pages`, `ocr`, `processing_time_ms`
+**Input (base64 mode):** `file_content` (base64 PDF), `filename`, `lang`, `parse_method`, `formula_enable`, `table_enable`, `max_pages`, `pages` (1-indexed list), `timeout` (ms), `created_at` (epoch ms)
+
+**Output:** `markdown`, `content_list`, `status`, `pages`, `ocr`, `processing_time_ms`
 
 ## Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `S3_ENDPOINT` | — | SeaweedFS S3 endpoint URL |
+| `S3_BUCKET` | — | S3 bucket name |
+| `S3_ACCESS_KEY` | — | S3 access key |
+| `S3_SECRET_KEY` | — | S3 secret key |
+| `S3_REGION` | `us-east-1` | S3 region |
 | `MINERU_MODEL_SOURCE` | `local` | Use baked-in models |
 | `HF_HUB_OFFLINE` | `1` | Prevent huggingface_hub HTTP calls |
 | `TRANSFORMERS_OFFLINE` | `1` | Prevent transformers HTTP calls |

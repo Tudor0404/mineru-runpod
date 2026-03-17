@@ -6,6 +6,7 @@ Merges optimizations from firecrawl/mineru-api PRs #8, #9, #11, #12, #13:
 - PdfiumError retry with PDF repair
 - Specific page extraction
 - Processing metadata in response
+- S3 (SeaweedFS) PDF retrieval — accepts s3_key instead of base64
 """
 
 import base64
@@ -48,6 +49,43 @@ _gpu_executor = concurrent.futures.ThreadPoolExecutor(
 
 class TimeoutError(Exception):
     pass
+
+
+# ---------------------------------------------------------------------------
+# S3 client (lazy — only initialized when s3_key is first used)
+# ---------------------------------------------------------------------------
+
+_s3_client = None
+
+
+def _get_s3_client():
+    """Return a boto3 S3 client, initializing on first call.
+
+    Lazy so the worker still starts without S3 env vars (e.g. local
+    testing with base64 file_content).
+    """
+    global _s3_client
+    if _s3_client is None:
+        import boto3
+        from botocore.client import Config as BotoConfig
+
+        _s3_client = boto3.client(
+            "s3",
+            endpoint_url=os.environ["S3_ENDPOINT"],
+            aws_access_key_id=os.environ["S3_ACCESS_KEY"],
+            aws_secret_access_key=os.environ["S3_SECRET_KEY"],
+            region_name=os.environ.get("S3_REGION", "us-east-1"),
+            config=BotoConfig(signature_version="s3v4"),
+        )
+    return _s3_client
+
+
+def _download_from_s3(s3_key: str) -> bytes:
+    """Download a PDF from SeaweedFS/S3 and return raw bytes."""
+    client = _get_s3_client()
+    bucket = os.environ["S3_BUCKET"]
+    response = client.get_object(Bucket=bucket, Key=s3_key)
+    return response["Body"].read()
 
 
 # ---------------------------------------------------------------------------
@@ -193,9 +231,15 @@ async def async_convert_to_markdown(pdf_bytes, timeout_seconds=None, **kwargs):
 # ---------------------------------------------------------------------------
 
 async def handler(event):
-    """Main serverless handler."""
+    """Main serverless handler.
+
+    Accepts either:
+      - s3_key: download PDF from SeaweedFS (preferred, ~100 byte payload)
+      - file_content + filename: base64-encoded PDF (legacy/local testing)
+    """
     try:
         input_data = event.get("input", {})
+        s3_key = input_data.get("s3_key")
         base64_content = input_data.get("file_content")
         filename = input_data.get("filename")
         timeout = input_data.get("timeout")
@@ -222,12 +266,18 @@ async def handler(event):
                 if timeout_seconds < 1:
                     return {"error": "Insufficient time remaining", "status": "TIMEOUT"}
 
-        # Validate input
-        if not base64_content or not filename:
-            return {"error": "Missing file_content or filename", "status": "ERROR"}
-
-        if not filename.lower().endswith('.pdf'):
-            return {"error": "Only PDF files supported", "status": "ERROR"}
+        # Get PDF bytes from S3 or base64
+        if s3_key:
+            try:
+                pdf_bytes = _download_from_s3(s3_key)
+            except Exception as e:
+                return {"error": f"Failed to download PDF from S3: {e}", "status": "ERROR"}
+        elif base64_content and filename:
+            if not filename.lower().endswith('.pdf'):
+                return {"error": "Only PDF files supported", "status": "ERROR"}
+            pdf_bytes = base64.b64decode(base64_content)
+        else:
+            return {"error": "Missing s3_key or file_content+filename", "status": "ERROR"}
 
         if max_pages is not None:
             try:
@@ -246,8 +296,6 @@ async def handler(event):
                     return {"error": "pages must contain only positive integers", "status": "ERROR"}
             except Exception:
                 return {"error": "Invalid pages; must be a list of integers", "status": "ERROR"}
-
-        pdf_bytes = base64.b64decode(base64_content)
 
         md_content, content_list, metadata = await async_convert_to_markdown(
             pdf_bytes=pdf_bytes,

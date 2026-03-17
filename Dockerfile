@@ -21,7 +21,8 @@ RUN uv venv .venv && \
     uv pip install --python .venv/bin/python \
         "mineru[pipeline]>=2.7.0,<3.0.0" \
         "runpod>=1.7.12,<2.0.0" \
-        "pypdf>=4.2.0,<6.0.0" && \
+        "pypdf>=4.2.0,<6.0.0" \
+        "boto3>=1.34.0,<2.0.0" && \
     rm -rf /root/.cache/uv /root/.cache/pip
 
 ENV PATH="/app/.venv/bin:$PATH"
