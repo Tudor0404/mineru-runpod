@@ -76,4 +76,22 @@ ENV TORCH_COMPILE_MODE=reduce-overhead
 ENV OCR_DET_MAX_FORWARD_BATCH=1
 ENV RUNPOD_INIT_TIMEOUT=300
 
+# S3 credentials — set via RunPod secrets in the endpoint template.
+# One image serves both dev and prod; the environment is determined by
+# which secrets the endpoint references.
+#
+# Dev endpoint:
+#   S3_ENDPOINT   = {{ RUNPOD_SECRET_dev_s3_endpoint }}
+#   S3_BUCKET     = {{ RUNPOD_SECRET_dev_s3_bucket }}
+#   S3_ACCESS_KEY = {{ RUNPOD_SECRET_dev_s3_access_key }}
+#   S3_SECRET_KEY = {{ RUNPOD_SECRET_dev_s3_secret_key }}
+#   S3_REGION     = {{ RUNPOD_SECRET_dev_s3_region }}
+#
+# Prod endpoint:
+#   S3_ENDPOINT   = {{ RUNPOD_SECRET_prod_s3_endpoint }}
+#   S3_BUCKET     = {{ RUNPOD_SECRET_prod_s3_bucket }}
+#   S3_ACCESS_KEY = {{ RUNPOD_SECRET_prod_s3_access_key }}
+#   S3_SECRET_KEY = {{ RUNPOD_SECRET_prod_s3_secret_key }}
+#   S3_REGION     = {{ RUNPOD_SECRET_prod_s3_region }}
+
 ENTRYPOINT ["python3", "-m", "app.serverless"]

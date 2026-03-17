@@ -65,3 +65,27 @@ curl -X POST http://localhost:8000/run \
 | `RUNPOD_INIT_TIMEOUT` | `300` | Init timeout (seconds) |
 | `DEBUG_SERVER` | `false` | Run as FastAPI on port 8000 |
 | `OCR_DET_MAX_FORWARD_BATCH` | `1` | Cap OCR-det batch size |
+
+## RunPod Secrets
+
+S3 credentials are injected via RunPod secrets at the endpoint level — **one Docker image serves both dev and prod**. Create two serverless endpoints from the same image, each referencing its own set of secrets.
+
+Secrets are not visible to endpoints unless explicitly referenced as env vars using `{{ RUNPOD_SECRET_<name> }}`.
+
+### Secret Names
+
+| Env Variable | Dev Secret | Prod Secret |
+|---|---|---|
+| `S3_ENDPOINT` | `dev_s3_endpoint` | `prod_s3_endpoint` |
+| `S3_BUCKET` | `dev_s3_bucket` | `prod_s3_bucket` |
+| `S3_ACCESS_KEY` | `dev_s3_access_key` | `prod_s3_access_key` |
+| `S3_SECRET_KEY` | `dev_s3_secret_key` | `prod_s3_secret_key` |
+| `S3_REGION` | `dev_s3_region` | `prod_s3_region` |
+
+### Setup
+
+1. Create all 10 secrets in RunPod (Settings > Secrets)
+2. Build and push **one** Docker image
+3. Create **two** serverless endpoints from the same image:
+   - **Dev endpoint** — set env vars referencing `dev_*` secrets (e.g. `S3_ENDPOINT={{ RUNPOD_SECRET_dev_s3_endpoint }}`)
+   - **Prod endpoint** — set env vars referencing `prod_*` secrets (e.g. `S3_ENDPOINT={{ RUNPOD_SECRET_prod_s3_endpoint }}`)
