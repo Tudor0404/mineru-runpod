@@ -233,26 +233,30 @@ async def async_convert_to_markdown(pdf_bytes, timeout_seconds=None, **kwargs):
 async def handler(event):
     """Main serverless handler.
 
-    Accepts either:
-      - s3_key: download PDF from SeaweedFS (preferred, ~100 byte payload)
-      - file_content + filename: base64-encoded PDF (legacy/local testing)
+    Primary mode (S3):
+      {"input": {"s3_key": "docs/abc.pdf", "config": {"lang": "en", ...}}}
+
+    Legacy mode (base64, for local testing):
+      {"input": {"file_content": "<b64>", "filename": "test.pdf", ...}}
     """
     try:
         input_data = event.get("input", {})
         s3_key = input_data.get("s3_key")
         base64_content = input_data.get("file_content")
         filename = input_data.get("filename")
-        timeout = input_data.get("timeout")
-        created_at = input_data.get("created_at")
-        max_pages = input_data.get("max_pages")
-        pages = input_data.get("pages")
 
-        lang = input_data.get("lang", "en")
-        # Default to "ocr" when specific pages are requested (caller already
-        # determined these pages need OCR)
-        parse_method = input_data.get("parse_method", "ocr" if pages else "auto")
-        formula_enable = input_data.get("formula_enable", True)
-        table_enable = input_data.get("table_enable", True)
+        # S3 mode uses nested config; base64 mode uses flat fields
+        config = input_data.get("config", {})
+
+        timeout = input_data.get("timeout") or config.get("timeout")
+        created_at = input_data.get("created_at") or config.get("created_at")
+        max_pages = input_data.get("max_pages") or config.get("max_pages")
+        pages = input_data.get("pages") or config.get("pages")
+
+        lang = config.get("lang", input_data.get("lang", "en"))
+        parse_method = config.get("parse_method", input_data.get("parse_method", "ocr" if pages else "auto"))
+        formula_enable = config.get("formula_enable", input_data.get("formula_enable", True))
+        table_enable = config.get("table_enable", input_data.get("table_enable", True))
 
         # Calculate remaining timeout
         timeout_seconds = None
@@ -270,6 +274,7 @@ async def handler(event):
         if s3_key:
             try:
                 pdf_bytes = _download_from_s3(s3_key)
+                print(f"Downloaded s3://{os.environ['S3_BUCKET']}/{s3_key} ({len(pdf_bytes)} bytes)")
             except Exception as e:
                 return {"error": f"Failed to download PDF from S3: {e}", "status": "ERROR"}
         elif base64_content and filename:
